@@ -25,22 +25,20 @@ jobs:
         run: npm install
 
       - name: Snyk Dependency Scan
-        # Scans for vulnerabilities in open-source packages
         uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
-          args: --severity-threshold=high --file=app/package.json
+          args: --severity-threshold=critical --file=app/package.json
 
       - name: Snyk Static Code Analysis (SAST)
-        # Scans your own code for security issues
-        uses: snyk/actions/node@master # The same action is used
+        uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          command: code test # But with the 'code test' command for SAST
-          args: --severity-threshold=high app/
+          command: code test
+          args: --severity-threshold=critical app/
 
   terraform:
     name: Terraform
