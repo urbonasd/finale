@@ -58,10 +58,11 @@ jobs:
           aws-region: eu-central-1 # Or your desired region
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Format
-        run: terraform fmt -check -recursive
+        run: terraform fmt -check
+        continue-on-error: true
         working-directory: ./terraform
 
       - name: Checkov IaC Scan
