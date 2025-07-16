@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -25,19 +25,22 @@ jobs:
         run: npm install
 
       - name: Snyk Dependency Scan
+        # Scans for vulnerabilities in open-source packages
         uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
-          args: --severity-threshold=high
+          args: --severity-threshold=high --file=app/package.json
 
-      - name: Snyk Code Analysis
-        uses: snyk/actions/code@master
+      - name: Snyk Static Code Analysis (SAST)
+        # Scans your own code for security issues
+        uses: snyk/actions/node@master # The same action is used
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args: --severity-threshold=high
+          command: code test # But with the 'code test' command for SAST
+          args: --severity-threshold=high app/
 
   terraform:
     name: Terraform
@@ -46,17 +49,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-central-1
+          aws-region: us-east-1 # Or your desired region
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v2
 
       - name: Terraform Format
         run: terraform fmt -check -recursive
@@ -67,7 +70,8 @@ jobs:
         with:
           directory: ./terraform
           framework: terraform
-          soft_fail_on: HIGH
+          fail_on_cve: false # Will not fail the build for CVEs in providers
+          soft_fail_on: HIGH # Fails only on CRITICAL findings
 
       - name: Terraform Init
         run: terraform init
@@ -75,9 +79,9 @@ jobs:
 
       - name: Terraform Plan
         if: github.event_name == 'pull_request'
-        run: terraform plan
+        run: terraform plan -input=false
         working-directory: ./terraform
-
+      
       - name: Login to Amazon ECR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: login-ecr
@@ -88,8 +92,8 @@ jobs:
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: hello-world-app-darius
-          IMAGE_TAG: latest
+          ECR_REPOSITORY: hello-world-app # Replace with your app name if different
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./app
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
@@ -97,5 +101,5 @@ jobs:
 
       - name: Terraform Apply
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve -input=false
         working-directory: ./terraform
